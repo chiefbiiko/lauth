@@ -25,30 +25,10 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Creates a genereic access token header. */
-function createAccessTokenHeader(source: BWT.Header = {}): BWT.Header {
-  const now: number = Date.now();
-
-  return {
-    typ: "BWTv0",
-    iat: now,
-    exp: now + 1000 * 60 * 60 * 1,
-    kid: "",
-    ...source
-  };
-}
-
-/** Creates a genereic refresh token header. */
-function createRefreshTokenHeader(source: BWT.Header = {}): BWT.Header {
-  const now: number = Date.now();
-
-  return {
-    typ: "BWTv0",
-    iat: now,
-    exp: now + 1000 * 60 * 60 * 3,
-    kid: "",
-    ...source
-  };
+/** superauth options. */
+export interface SuperAuthOptions {
+  accessTokenTTL?: number
+  refreshTokenTTL?: number  
 }
 
 /**
@@ -61,8 +41,35 @@ function createRefreshTokenHeader(source: BWT.Header = {}): BWT.Header {
 export function superauth(
   credentialsMap: Map<string, { password: string; role: string }>,
   ownKeyPair: BWT.KeyPair,
-  resourceEndpointsPublicKey: BWT.PeerPublicKey
+  resourceEndpointsPublicKey: BWT.PeerPublicKey,
+  options: SuperAuthOptions = {}
 ): (req: ServerRequest) => void {
+  // /** Creates a genereic access token header. */
+  // function createAccessTokenHeader(source: BWT.Header = {}): BWT.Header {
+  //   const now: number = Date.now();
+  // 
+  //   return {
+  //     typ: "BWTv0",
+  //     iat: now,
+  //     exp: now + 1000 * 60 * 60 * 1,
+  //     kid: "",
+  //     ...source
+  //   };
+  // }
+  // 
+  // /** Creates a genereic refresh token header. */
+  // function createRefreshTokenHeader(source: BWT.Header = {}): BWT.Header {
+  //   const now: number = Date.now();
+  // 
+  //   return {
+  //     typ: "BWTv0",
+  //     iat: now,
+  //     exp: now + 1000 * 60 * 60 * 3,
+  //     kid: "",
+  //     ...source
+  //   };
+  // }
+  
   // public key and kid document for the auth endpoint itself
   const ownPublicKeyAndKid: BWT.PeerPublicKey = {
     pk: ownKeyPair.pk,
