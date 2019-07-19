@@ -2,6 +2,10 @@ import { ServerRequest } from "https://deno.land/std/http/server.ts";
 import { encode } from "https://denopkg.com/chiefbiiko/std-encoding/mod.ts";
 import * as BWT from "https://denopkg.com/chiefbiiko/bwt/mod.ts";
 
+/** Token TTL in ms. */
+const oneHour: number = 1000 * 60 * 60 * 1;
+const twoHours: number = 1000 * 60 * 60 * 2;
+
 /**
  * Generic authentication function factory.
  * Provides signup, signin, and refresh handlers.
@@ -25,10 +29,10 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** superauth options. */
+/** superauth  */
 export interface SuperAuthOptions {
-  accessTokenTTL?: number
-  refreshTokenTTL?: number  
+  accessTokenTTL?: number;
+  refreshTokenTTL?: number;
 }
 
 /**
@@ -42,34 +46,11 @@ export function superauth(
   credentialsMap: Map<string, { password: string; role: string }>,
   ownKeyPair: BWT.KeyPair,
   resourceEndpointsPublicKey: BWT.PeerPublicKey,
-  options: SuperAuthOptions = {}
+  {
+    accessTokenTTL = oneHour,
+    refreshTokenTTL = twoHours
+  }: SuperAuthOptions = {}
 ): (req: ServerRequest) => void {
-  // /** Creates a genereic access token header. */
-  // function createAccessTokenHeader(source: BWT.Header = {}): BWT.Header {
-  //   const now: number = Date.now();
-  // 
-  //   return {
-  //     typ: "BWTv0",
-  //     iat: now,
-  //     exp: now + 1000 * 60 * 60 * 1,
-  //     kid: "",
-  //     ...source
-  //   };
-  // }
-  // 
-  // /** Creates a genereic refresh token header. */
-  // function createRefreshTokenHeader(source: BWT.Header = {}): BWT.Header {
-  //   const now: number = Date.now();
-  // 
-  //   return {
-  //     typ: "BWTv0",
-  //     iat: now,
-  //     exp: now + 1000 * 60 * 60 * 3,
-  //     kid: "",
-  //     ...source
-  //   };
-  // }
-  
   // public key and kid document for the auth endpoint itself
   const ownPublicKeyAndKid: BWT.PeerPublicKey = {
     pk: ownKeyPair.pk,
@@ -120,15 +101,24 @@ export function superauth(
         return req.respond({ status: 401 });
       }
 
+      // now in ms
+      const now: number = Date.now();
+
+      // access token TTL
+      const accessTokenExp: number = now + (accessTokenTTL || oneHour);
+
+      // refresh token TTL
+      const refreshTokenExp: number = now + (refreshTokenTTL || twoHours);
+
       // stringify an access token
       const accessToken: string = stringifyAccessToken(
-        createAccessTokenHeader({ kid: ownKeyPair.kid }),
+        { typ: "BWTv0", iat: now, exp: accessTokenExp, kid: ownKeyPair.kid },
         { subtype: "access", role: credentials.role, username }
       );
 
       // stringify a refresh token
       const refreshToken: string = stringifyRefreshToken(
-        createRefreshTokenHeader({ kid: ownKeyPair.kid }),
+        { typ: "BWTv0", iat: now, exp: refreshTokenExp, kid: ownKeyPair.kid },
         { subtype: "refresh", role: credentials.role, username }
       );
 
@@ -159,9 +149,18 @@ export function superauth(
         contents.payload.username
       );
 
+      // now in ms
+      const now: number = Date.now();
+
+      // access token TTL
+      const accessTokenExp: number = now + (accessTokenTTL || oneHour);
+
+      // refresh token TTL
+      const refreshTokenExp: number = now + (refreshTokenTTL || twoHours);
+
       // stringify an access token
       const accessToken: string = stringifyAccessToken(
-        createAccessTokenHeader({ kid: ownKeyPair.kid }),
+        { typ: "BWTv0", iat: now, exp: accessTokenExp, kid: ownKeyPair.kid },
         {
           subtype: "access",
           username: contents.payload.username,
@@ -171,7 +170,7 @@ export function superauth(
 
       // stringify a refresh token
       const refreshToken: string = stringifyRefreshToken(
-        createRefreshTokenHeader({ kid: ownKeyPair.kid }),
+        { typ: "BWTv0", iat: now, exp: refreshTokenExp, kid: ownKeyPair.kid },
         {
           subtype: "refresh",
           role: contents.payload.role,
@@ -185,6 +184,7 @@ export function superauth(
         body: encode(JSON.stringify({ accessToken, refreshToken }), "utf8")
       });
     } else {
+      // invalid request
       return req.respond({ status: 400 });
     }
   };
