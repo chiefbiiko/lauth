@@ -3,14 +3,14 @@
 <head>
   <script>
     const $ = document.querySelector
-    $("#signup").onclick = e => {
+    
+    $("#signup").onclick = () => {
       const email = $("#email").innerText;
       const password = $("#password").innerText;
+      const body = JSON.stringify({ email, password })
       
-      fetch("localhost:4190/signup", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      }).catch(console.error)
+      fetch("localhost:4190/signup", { method: "POST", body })
+        .catch(err => alert(err.message))
     }
   </script>
 </head>
