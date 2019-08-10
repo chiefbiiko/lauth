@@ -19,11 +19,9 @@ const TWO_HOURS: number = 1000 * 60 * 60 * 2;
 
 /** Hopefully a somewhat timing-attack-robust string equality check. */
 function constantTimeEqual(a: string, b: string): boolean {
-  const length: number = Math.max(a.length, b.length);
-
   let diff: number = a.length === b.length ? 0 : 1;
 
-  for (let i: number = length - 1; i >= 0; --i) {
+  for (let i: number = Math.max(a.length, b.length) - 1; i >= 0; --i) {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
 
