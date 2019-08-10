@@ -5,8 +5,8 @@
     const $ = document.querySelector
     
     $("#signup").onclick = () => {
-      const email = $("#email").innerText;
-      const password = $("#password").innerText;
+      const email = $("#email").value;
+      const password = $("#password").^value;
       const body = JSON.stringify({ email, password })
       
       fetch("localhost:4190/signup", { method: "POST", body })

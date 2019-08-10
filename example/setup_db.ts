@@ -1,6 +1,9 @@
-import { DynamoDBClient, createClient } from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
+import {
+  DynamoDBClient,
+  createClient
+} from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
 
-const ENV: {[key:string]:any} = Deno.env();
+const ENV: { [key: string]: any } = Deno.env();
 
 const ddbc: DynamoDBClient = createClient({
   accessKeyId: ENV.ACCESS_KEY_ID || "fraud",
@@ -9,8 +12,8 @@ const ddbc: DynamoDBClient = createClient({
 });
 
 async function main(): Promise<void> {
-  let result: {[key:string]:any} = await ddbc.listTables();
-  
+  let result: { [key: string]: any } = await ddbc.listTables();
+
   if (!result.TableNames.includes("users")) {
     await ddbc.createTable({
       TableName: "users",
@@ -19,7 +22,7 @@ async function main(): Promise<void> {
       ProvisionedThroughput: { ReadCapacityUnits: 1, WriteCapacityUnits: 1 }
     });
   }
-  
+
   if (!result.TableNames.includes("users_emails")) {
     await ddbc.createTable({
       TableName: "users_emails",

@@ -1,16 +1,19 @@
 import { Server, serve } from "https://deno.land/std/http/server.ts";
 import * as BWT from "https://denopkg.com/chiefbiiko/bwt/mod.ts";
-import { DynamoDBClient, createClient } from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
-import { Handler, UserPrivate } from "./../common.ts"
+import {
+  DynamoDBClient,
+  createClient
+} from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
+import { Handler, UserPrivate } from "./../common.ts";
 import {
   createSignUpHandler,
   createSignInHandler,
   createRefreshHandler
 } from "./../mod.ts";
 
-const INDEX_HTML:Uint8Array = Deno.readFileSync("./index.html")
+const INDEX_HTML: Uint8Array = Deno.readFileSync("./index.html");
 
-const ENV: {[key:string]:any} = Deno.env();
+const ENV: { [key: string]: any } = Deno.env();
 
 const ddbc: DynamoDBClient = createClient({
   accessKeyId: ENV.ACCESS_KEY_ID || "fraud",
@@ -19,9 +22,17 @@ const ddbc: DynamoDBClient = createClient({
 });
 
 // make sure you get dynamodb_local_latest, if not google or just ./start_db.sh
-Deno.run({ args: ['java', '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"','-jar', '"dynamodb_local_latest/DynamoDBLocal.jar"', '-sharedDb']});
+Deno.run({
+  args: [
+    "java",
+    '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"',
+    "-jar",
+    '"dynamodb_local_latest/DynamoDBLocal.jar"',
+    "-sharedDb"
+  ]
+});
 
-Deno.run({ args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]});
+Deno.run({ args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"] });
 
 const authEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
 
@@ -33,35 +44,47 @@ const resourceEndpointsPeerPublicKey: BWT.PeerPublicKey = {
 };
 
 async function emailExists(email: string): Promise<boolean> {
-  const result: {[key:string]: any} = await ddbc.getItem({
+  const result: { [key: string]: any } = await ddbc.getItem({
     TableName: "users_emails",
     Key: { email }
   });
-  
-  return !!result.Item
+
+  return !!result.Item;
 }
 
 async function createUser(user: UserPrivate): Promise<void> {
   await ddbc.putItem({ TableName: "users", Item: user });
-  
+
   await ddbc.putItem({
     TableName: "users_emails",
     Item: { email: user.email, id: user.id }
   });
 }
 
-async function readUser(id: any) : Promise<UserPrivate> {
-  const result: {[key:string]:any} = await ddbc.getItem({
+async function readUser(id: any): Promise<UserPrivate> {
+  const result: { [key: string]: any } = await ddbc.getItem({
     TableName: "users",
     Key: { id }
-  })
-  
+  });
+
   return result.Item;
 }
 
-const signUp: Handler = createSignUpHandler("CUSTOMER", emailExists, createUser)
-const signIn: Handler = createSignInHandler(authEndpointsKeypair, resourceEndpointsPeerPublicKey, readUser) 
-const refresh: Handler = createRefreshHandler(authEndpointsKeypair, resourceEndpointsPeerPublicKey, readUser)
+const signUp: Handler = createSignUpHandler(
+  "CUSTOMER",
+  emailExists,
+  createUser
+);
+const signIn: Handler = createSignInHandler(
+  authEndpointsKeypair,
+  resourceEndpointsPeerPublicKey,
+  readUser
+);
+const refresh: Handler = createRefreshHandler(
+  authEndpointsKeypair,
+  resourceEndpointsPeerPublicKey,
+  readUser
+);
 
 const s: Server = serve("localhost:4190");
 
@@ -76,7 +99,11 @@ async function main(): Promise<void> {
     } else if (req.url.endsWith("refresh")) {
       refresh(req);
     } else {
-      req.respond({ status: 200, body: INDEX_HTML, headers: new Headers({ 'content-type': 'text/html'}) });
+      req.respond({
+        status: 200,
+        body: INDEX_HTML,
+        headers: new Headers({ "content-type": "text/html" })
+      });
     }
   }
 }
