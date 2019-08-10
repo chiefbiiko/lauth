@@ -70,6 +70,11 @@ export function createSignInHandler(
     // fetch expected credentials from db
     const user: UserPrivate = await readUser(email);
 
+    // make sure the user exists
+    if (!user) {
+      return req.respond({ status: 400 });
+    }
+
     // hash the incoming password to a comparable salted hash
     const hash: Uint8Array = blake2b(
       encode(saslprep(password), "utf8"),

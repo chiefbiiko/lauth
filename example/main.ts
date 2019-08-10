@@ -1,6 +1,4 @@
 import { Server, serve } from "https://deno.land/std/http/server.ts";
-// import { resolve } from "https://deno.land/std/fs/path/mod.ts";
-import { encode } from "https://denopkg.com/chiefbiiko/std-encoding/mod.ts";
 import * as BWT from "https://denopkg.com/chiefbiiko/bwt/mod.ts";
 import { DynamoDBClient, createClient } from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
 import { Handler, UserPrivate } from "./../common.ts"
@@ -20,9 +18,10 @@ const ddbc: DynamoDBClient = createClient({
   region: "local"
 });
 
-Deno.run({ args: ["./start_db.sh"]});
+// make sure you get dynamodb_local_latest, if not google or just ./start_db.sh
+Deno.run({ args: ['java', '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"','-jar', '"dynamodb_local_latest/DynamoDBLocal.jar"', '-sharedDb']});
 
-Deno.run({ args: ["deno", "./setup_db.ts"]});
+Deno.run({ args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]});
 
 const authEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
 
@@ -33,7 +32,6 @@ const resourceEndpointsPeerPublicKey: BWT.PeerPublicKey = {
   kid: resourceEndpointsKeypair.kid
 };
 
-// TODO: create all the handlers
 async function emailExists(email: string): Promise<boolean> {
   const result: {[key:string]: any} = await ddbc.getItem({
     TableName: "users_emails",
@@ -68,7 +66,7 @@ const refresh: Handler = createRefreshHandler(authEndpointsKeypair, resourceEndp
 const s: Server = serve("localhost:4190");
 
 async function main(): Promise<void> {
-  console.log("serving @ 0.0.0.0:4190");
+  console.log("serving @ localhost:4190");
 
   for await (const req of s) {
     if (req.url.endsWith("signup")) {
@@ -78,7 +76,7 @@ async function main(): Promise<void> {
     } else if (req.url.endsWith("refresh")) {
       refresh(req);
     } else {
-      req.respond({ status: 200, body: INDEX_HTML });
+      req.respond({ status: 200, body: INDEX_HTML, headers: new Headers({ 'content-type': 'text/html'}) });
     }
   }
 }
