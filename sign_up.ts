@@ -45,7 +45,7 @@ export function createSignUpHandler(
         BLAKE2B_CUSTOM_BYTES,
         null,
         salt
-      );
+      ) as Uint8Array;
 
       // create the user
       await createUser({ ...user, id: uuidV4(), role, password: hash, salt });

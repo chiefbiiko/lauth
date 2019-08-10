@@ -1,0 +1,24 @@
+<!doctype>
+<html>
+<head>
+  <script>
+    const $ = document.querySelector
+    $("#signup").onclick = e => {
+      const email = $("#email").innerText;
+      const password = $("#password").innerText;
+      
+      fetch("localhost:4190/signup", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }).catch(console.error)
+    }
+  </script>
+</head>
+<body>
+  <input type="text" id="email" placeholder="email"><br>
+  <input type="text" id="password" placeholder="password"><br>
+  <button id="signup">signup</button>
+  <button id="signin">signin</button>
+  <button id="refresh">refresh</button>
+</body>
+</html>

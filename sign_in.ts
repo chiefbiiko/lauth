@@ -78,7 +78,7 @@ export function createSignInHandler(
       BLAKE2B_CUSTOM_BYTES,
       null,
       user.salt
-    );
+    ) as Uint8Array;
 
     // assert correct credentials
     if (!equal(hash, user.password)) {
