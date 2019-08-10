@@ -21,19 +21,6 @@ const ddbc: DynamoDBClient = createClient({
   region: "local"
 });
 
-// make sure you get dynamodb_local_latest, if not google or just ./start_db.sh
-Deno.run({
-  args: [
-    "java",
-    '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"',
-    "-jar",
-    '"dynamodb_local_latest/DynamoDBLocal.jar"',
-    "-sharedDb"
-  ]
-});
-
-Deno.run({ args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"] });
-
 const authEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
 
 const resourceEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
@@ -75,11 +62,13 @@ const signUp: Handler = createSignUpHandler(
   emailExists,
   createUser
 );
+
 const signIn: Handler = createSignInHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
   readUser
 );
+
 const refresh: Handler = createRefreshHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
@@ -89,6 +78,38 @@ const refresh: Handler = createRefreshHandler(
 const s: Server = serve("localhost:4190");
 
 async function main(): Promise<void> {
+  let proc: Deno.Process = Deno.run({ args: ["./start_db.sh"] });
+
+  let status: Deno.ProcessStatus = await proc.status();
+
+  if (!status.success) {
+    proc = Deno.run({
+      args: [
+        "java",
+        '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"',
+        "-jar",
+        '"dynamodb_local_latest/DynamoDBLocal.jar"',
+        "-sharedDb"
+      ]
+    });
+
+    let status: Deno.ProcessStatus = await proc.status();
+
+    if (!status.success) {
+      throw new Error("failed starting the db");
+    }
+  }
+
+  proc = Deno.run({
+    args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]
+  });
+
+  status = await proc.status();
+
+  if (!status.success) {
+    throw new Error("failed setting up the db");
+  }
+
   console.log("serving @ localhost:4190");
 
   for await (const req of s) {
