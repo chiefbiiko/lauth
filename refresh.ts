@@ -13,7 +13,7 @@ import {
 export function createRefreshHandler(
   ownKeyPair: BWT.KeyPair,
   resourceEndpointsPeerPublicKey: BWT.PeerPublicKey,
-  readUser: (id: any) => Promise<UserPrivate>,
+  readUserById: (id: any) => Promise<UserPrivate>,
   {
     accessTokenTTL = ONE_HOUR,
     refreshTokenTTL = TWO_HOURS
@@ -75,7 +75,7 @@ export function createRefreshHandler(
     }
 
     // issuing an access and refresh token
-    const user: UserPrivate = await readUser(contents.payload.id);
+    const user: UserPrivate = await readUserById(contents.payload.id);
 
     const now: number = Date.now();
 

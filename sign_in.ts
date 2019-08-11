@@ -18,7 +18,7 @@ import {
 export function createSignInHandler(
   ownKeyPair: BWT.KeyPair,
   resourceEndpointsPeerPublicKey: BWT.PeerPublicKey,
-  readUser: (email: string) => Promise<UserPrivate>,
+  readUserByEmail: (email: string) => Promise<UserPrivate>,
   {
     accessTokenTTL = ONE_HOUR,
     refreshTokenTTL = TWO_HOURS
@@ -68,7 +68,7 @@ export function createSignInHandler(
     }
 
     // fetch expected credentials from db
-    const user: UserPrivate = await readUser(email);
+    const user: UserPrivate = await readUserByEmail(email);
 
     // make sure the user exists
     if (!user) {

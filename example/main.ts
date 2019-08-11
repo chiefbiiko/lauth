@@ -48,13 +48,31 @@ async function createUser(user: UserPrivate): Promise<void> {
   });
 }
 
-async function readUser(id: any): Promise<UserPrivate> {
+async function readUserById(id: any): Promise<UserPrivate> {
   const result: { [key: string]: any } = await ddbc.getItem({
     TableName: "users",
     Key: { id }
   });
 
-  return result.Item;
+  return result.Item || null;
+}
+
+async function readUserByEmail(email: string): Promise<UserPrivate> {
+  let result: { [key: string]: any } = await ddbc.getItem({
+    TableName: "users_emails",
+    Key: { email }
+  });
+
+  if (!result.Item) {
+    return null;
+  }
+
+  result = await ddbc.getItem({
+    TableName: "users",
+    Key: { id: result.Item.id }
+  });
+
+  return result.Item || null;
 }
 
 const signUp: Handler = createSignUpHandler(
@@ -66,33 +84,19 @@ const signUp: Handler = createSignUpHandler(
 const signIn: Handler = createSignInHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
-  readUser
+  readUserByEmail
 );
 
 const refresh: Handler = createRefreshHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
-  readUser
+  readUserById
 );
 
 const s: Server = serve("localhost:4190");
 
 async function main(): Promise<void> {
-  try {
-    Deno.run({ args: ["./start_db.sh"] })
-  } catch (_) {
-    Deno.run({
-      args: [
-        "java",
-        '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"',
-        "-jar",
-        '"dynamodb_local_latest/DynamoDBLocal.jar"',
-        "-sharedDb"
-      ]
-    });
-  }
-
-  Deno.run({args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]});
+  console.log("Hope you ran ./start_db.sh, then deno run -A ./setup_db.ts");
 
   console.log("serving @ localhost:4190");
 

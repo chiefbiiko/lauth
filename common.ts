@@ -22,11 +22,11 @@ export function equal(a: Uint8Array, b: Uint8Array): boolean {
 export const valid = {
   email(candidate: string): boolean {
     // TODO
-    return false;
+    return true;
   },
   password(candidate: string): boolean {
     // TODO
-    return false;
+    return true;
   }
 };
 
