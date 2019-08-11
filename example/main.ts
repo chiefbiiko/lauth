@@ -78,12 +78,10 @@ const refresh: Handler = createRefreshHandler(
 const s: Server = serve("localhost:4190");
 
 async function main(): Promise<void> {
-  let proc: Deno.Process = Deno.run({ args: ["./start_db.sh"] });
-
-  let status: Deno.ProcessStatus = await proc.status();
-
-  if (!status.success) {
-    proc = Deno.run({
+  try {
+    Deno.run({ args: ["./start_db.sh"] })
+  } catch (_) {
+    Deno.run({
       args: [
         "java",
         '-D"java.library.path=dynamodb_local_latest/DynamoDBLocal_lib"',
@@ -92,23 +90,9 @@ async function main(): Promise<void> {
         "-sharedDb"
       ]
     });
-
-    let status: Deno.ProcessStatus = await proc.status();
-
-    if (!status.success) {
-      throw new Error("failed starting the db");
-    }
   }
 
-  proc = Deno.run({
-    args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]
-  });
-
-  status = await proc.status();
-
-  if (!status.success) {
-    throw new Error("failed setting up the db");
-  }
+  Deno.run({args: ["deno", "--allow-env", "--allow-net", "./setup_db.ts"]});
 
   console.log("serving @ localhost:4190");
 
