@@ -49,6 +49,8 @@ export function createSignUpHandler(
 
       // create the user
       await createUser({ ...user, id: uuidV4(), role, password: hash, salt });
+
+      return req.respond({ status: 201 });
     } catch (err) {
       crashed(err);
 

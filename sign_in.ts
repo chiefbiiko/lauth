@@ -19,6 +19,7 @@ export function createSignInHandler(
   ownKeyPair: BWT.KeyPair,
   resourceEndpointsPeerPublicKey: BWT.PeerPublicKey,
   readUserByEmail: (email: string) => Promise<UserPrivate>,
+  crashed: (err: Error) => void = console.error,
   {
     accessTokenTTL = ONE_HOUR,
     refreshTokenTTL = TWO_HOURS
@@ -43,79 +44,85 @@ export function createSignInHandler(
   );
 
   return async function signIn(req: ServerRequest): Promise<void> {
-    // prepare parsing the auth header value
-    const authHeaderValue: string = req.headers.get("Authorization");
+    try {
+      // prepare parsing the auth header value
+      const authHeaderValue: string = req.headers.get("Authorization");
 
-    const firstSpace: number = authHeaderValue.indexOf(" ");
+      const firstSpace: number = authHeaderValue.indexOf(" ");
 
-    const authType: string = authHeaderValue
-      .substr(0, firstSpace)
-      .toLowerCase();
+      const authType: string = authHeaderValue
+        .substr(0, firstSpace)
+        .toLowerCase();
 
-    // assert correct auth mech
-    if (authType !== "basic") {
-      return req.respond({ status: 400 });
+      // assert correct auth mech
+      if (authType !== "basic") {
+        return req.respond({ status: 400 });
+      }
+
+      // parse the basic auth header value
+      const [email, password] = atob(
+        authHeaderValue.substr(firstSpace + 1)
+      ).split(":");
+
+      // validate the incoming credentials
+      if (!valid.email(email) || !valid.password(password)) {
+        return req.respond({ status: 400 });
+      }
+
+      // fetch expected credentials from db
+      const user: UserPrivate = await readUserByEmail(email);
+
+      // make sure the user exists
+      if (!user) {
+        return req.respond({ status: 400 });
+      }
+
+      // hash the incoming password to a comparable salted hash
+      const hash: Uint8Array = blake2b(
+        encode(saslprep(password), "utf8"),
+        null,
+        null,
+        BLAKE2B_CUSTOM_BYTES,
+        null,
+        user.salt
+      ) as Uint8Array;
+
+      // assert correct credentials
+      if (!equal(hash, user.password)) {
+        return req.respond({ status: 401 });
+      }
+
+      // issuing an access and refresh token
+      const now: number = Date.now();
+
+      const accessToken: string = stringifyAccessToken(
+        {
+          typ: "BWTv0",
+          iat: now,
+          exp: now + accessTokenTTL,
+          kid: ownKeyPair.kid
+        },
+        { subtype: "access", id: user.id, role: user.role }
+      );
+
+      const refreshToken: string = stringifyRefreshToken(
+        {
+          typ: "BWTv0",
+          iat: now,
+          exp: now + refreshTokenTTL,
+          kid: ownKeyPair.kid
+        },
+        { subtype: "refresh", id: user.id, role: user.role }
+      );
+
+      return req.respond({
+        status: 200,
+        body: encode(JSON.stringify({ accessToken, refreshToken }), "utf8")
+      });
+    } catch (err) {
+      crashed(err);
+
+      return req.respond({ status: 500 });
     }
-
-    // parse the basic auth header value
-    const [email, password] = atob(
-      authHeaderValue.substr(firstSpace + 1)
-    ).split(":");
-
-    // validate the incoming credentials
-    if (!valid.email(email) || !valid.password(password)) {
-      return req.respond({ status: 400 });
-    }
-
-    // fetch expected credentials from db
-    const user: UserPrivate = await readUserByEmail(email);
-
-    // make sure the user exists
-    if (!user) {
-      return req.respond({ status: 400 });
-    }
-
-    // hash the incoming password to a comparable salted hash
-    const hash: Uint8Array = blake2b(
-      encode(saslprep(password), "utf8"),
-      null,
-      null,
-      BLAKE2B_CUSTOM_BYTES,
-      null,
-      user.salt
-    ) as Uint8Array;
-
-    // assert correct credentials
-    if (!equal(hash, user.password)) {
-      return req.respond({ status: 401 });
-    }
-
-    // issuing an access and refresh token
-    const now: number = Date.now();
-
-    const accessToken: string = stringifyAccessToken(
-      {
-        typ: "BWTv0",
-        iat: now,
-        exp: now + accessTokenTTL,
-        kid: ownKeyPair.kid
-      },
-      { subtype: "access", id: user.id, role: user.role }
-    );
-
-    const refreshToken: string = stringifyRefreshToken(
-      {
-        typ: "BWTv0",
-        iat: now,
-        exp: now + refreshTokenTTL,
-        kid: ownKeyPair.kid
-      },
-      { subtype: "refresh", id: user.id, role: user.role }
-    );
-
-    return req.respond({
-      status: 200,
-      body: encode(JSON.stringify({ accessToken, refreshToken }), "utf8")
-    });
   };
 }

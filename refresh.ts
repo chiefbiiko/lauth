@@ -14,6 +14,7 @@ export function createRefreshHandler(
   ownKeyPair: BWT.KeyPair,
   resourceEndpointsPeerPublicKey: BWT.PeerPublicKey,
   readUserById: (id: any) => Promise<UserPrivate>,
+  crashed: (err: Error) => void = console.error,
   {
     accessTokenTTL = ONE_HOUR,
     refreshTokenTTL = TWO_HOURS
@@ -44,64 +45,70 @@ export function createRefreshHandler(
   );
 
   return async function refresh(req: ServerRequest): Promise<void> {
-    // prepare parsing the auth header value
-    const authHeaderValue: string = req.headers.get("Authorization");
+    try {
+      // prepare parsing the auth header value
+      const authHeaderValue: string = req.headers.get("Authorization");
 
-    const firstSpace: number = authHeaderValue.indexOf(" ");
+      const firstSpace: number = authHeaderValue.indexOf(" ");
 
-    const authType: string = authHeaderValue
-      .substr(0, firstSpace)
-      .toLowerCase();
+      const authType: string = authHeaderValue
+        .substr(0, firstSpace)
+        .toLowerCase();
 
-    // assert correct auth mech
-    if (authType !== "bearer") {
-      return req.respond({ status: 400 });
+      // assert correct auth mech
+      if (authType !== "bearer") {
+        return req.respond({ status: 400 });
+      }
+
+      // parse the refresh token from the bearer auth header value
+      const token: string = authHeaderValue.substr(firstSpace + 1);
+
+      // verify the token
+      const contents: BWT.Contents = parseRefreshToken(token);
+
+      // assert we got a valid refresh token
+      if (!contents) {
+        return req.respond({ status: 401 });
+      }
+
+      // make sure the token is a refresh token
+      if (contents.payload.subtype !== "refresh") {
+        return req.respond({ status: 403 });
+      }
+
+      // issuing an access and refresh token
+      const user: UserPrivate = await readUserById(contents.payload.id);
+
+      const now: number = Date.now();
+
+      const accessToken: string = stringifyAccessToken(
+        {
+          typ: "BWTv0",
+          iat: now,
+          exp: now + accessTokenTTL,
+          kid: ownKeyPair.kid
+        },
+        { subtype: "access", id: contents.payload.id, role: user.role }
+      );
+
+      const refreshToken: string = stringifyRefreshToken(
+        {
+          typ: "BWTv0",
+          iat: now,
+          exp: now + refreshTokenTTL,
+          kid: ownKeyPair.kid
+        },
+        { subtype: "refresh", id: contents.payload.id, role: user.role }
+      );
+
+      return req.respond({
+        status: 200,
+        body: encode(JSON.stringify({ accessToken, refreshToken }), "utf8")
+      });
+    } catch (err) {
+      crashed(err);
+
+      return req.respond({ status: 500 });
     }
-
-    // parse the refresh token from the bearer auth header value
-    const token: string = authHeaderValue.substr(firstSpace + 1);
-
-    // verify the token
-    const contents: BWT.Contents = parseRefreshToken(token);
-
-    // assert we got a valid refresh token
-    if (!contents) {
-      return req.respond({ status: 401 });
-    }
-
-    // make sure the token is a refresh token
-    if (contents.payload.subtype !== "refresh") {
-      return req.respond({ status: 403 });
-    }
-
-    // issuing an access and refresh token
-    const user: UserPrivate = await readUserById(contents.payload.id);
-
-    const now: number = Date.now();
-
-    const accessToken: string = stringifyAccessToken(
-      {
-        typ: "BWTv0",
-        iat: now,
-        exp: now + accessTokenTTL,
-        kid: ownKeyPair.kid
-      },
-      { subtype: "access", id: contents.payload.id, role: user.role }
-    );
-
-    const refreshToken: string = stringifyRefreshToken(
-      {
-        typ: "BWTv0",
-        iat: now,
-        exp: now + refreshTokenTTL,
-        kid: ownKeyPair.kid
-      },
-      { subtype: "refresh", id: contents.payload.id, role: user.role }
-    );
-
-    return req.respond({
-      status: 200,
-      body: encode(JSON.stringify({ accessToken, refreshToken }), "utf8")
-    });
   };
 }
