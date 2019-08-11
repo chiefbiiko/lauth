@@ -96,7 +96,9 @@ const refresh: Handler = createRefreshHandler(
 const s: Server = serve("localhost:4190");
 
 async function main(): Promise<void> {
-  console.log("Hope you ran ./start_db.sh, then deno run -A ./setup_db.ts");
+  console.log(
+    'Hope you ran "curl -sSL https://denopkg.com/chiefbiiko/dynamodb/start_db.sh | bash", then "deno run -A ./../setup_db.ts"'
+  );
 
   console.log("serving @ localhost:4190");
 
