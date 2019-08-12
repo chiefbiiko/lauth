@@ -3,23 +3,23 @@
 <head>
   <script>
   const $ = document.querySelector.bind(document);
-  
+
   window.onload = () => {
     $("#signup").onclick = () => {
       const email = $("#email").value;
       const password = $("#password").value;
       const body = JSON.stringify({ email, password });
-  
+
       fetch("http://localhost:4190/signup", { method: "POST", body }).catch(err =>
         alert(err.message)
       );
     };
-  
+
     $("#signin").onclick = async () => {
       const email = $("#email").value;
       const password = $("#password").value;
       const auth = btoa(`${email}:${password}`);
-  
+
       fetch("http://localhost:4190/signin", {
         method: "POST",
         headers: new Headers({
@@ -27,7 +27,7 @@
         })
       })
         .then(res => res.text())
-        .then(text => alert(`response: ${text}`))
+        .then(text => text && alert(`response: ${text}`))
         .catch(err => alert(err.message));
     };
   };

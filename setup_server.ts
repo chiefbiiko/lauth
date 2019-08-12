@@ -4,14 +4,14 @@ import {
   DynamoDBClient,
   createClient
 } from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
-import { Handler, UserPrivate } from "./../common.ts";
+import { Handler, UserPrivate } from "./common.ts";
 import {
   createSignUpHandler,
   createSignInHandler,
   createRefreshHandler
-} from "./../mod.ts";
+} from "./mod.ts";
 
-const INDEX_HTML: Uint8Array = Deno.readFileSync("./index.html");
+const INDEX_HTML: Uint8Array = Deno.readFileSync("./demo.html")
 
 const ENV: { [key: string]: any } = Deno.env();
 
@@ -84,23 +84,23 @@ const signUp: Handler = createSignUpHandler(
 const signIn: Handler = createSignInHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
-  readUserByEmail
+  readUserByEmail,
+  console.error,
+  // short lifetimes to test an expiry scenario
+  { accessTokenTTL: 1000, refreshTokenTTL: 2000 }
 );
 
 const refresh: Handler = createRefreshHandler(
   authEndpointsKeypair,
   resourceEndpointsPeerPublicKey,
-  readUserById
+  readUserById,
+  console.error,
+  // short lifetimes to test an expiry scenario
+  { accessTokenTTL: 1000, refreshTokenTTL: 2000 }
 );
 
-const s: Server = serve("localhost:4190");
-
 async function main(): Promise<void> {
-  console.log(
-    'Hope you ran "curl -sSL https://denopkg.com/chiefbiiko/dynamodb/start_db.sh | bash", then "deno run -A ./../setup_db.ts"'
-  );
-
-  console.log("serving @ localhost:4190");
+  const s: Server = serve("localhost:4190");
 
   for await (const req of s) {
     if (req.url.endsWith("signup")) {
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
       req.respond({
         status: 200,
         body: INDEX_HTML,
-        headers: new Headers({ "content-type": "text/html" })
+        headers: new Headers({ 'content-type': 'text/html' })
       });
     }
   }
