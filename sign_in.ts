@@ -74,7 +74,7 @@ export function createSignInHandler(
 
       // make sure the user exists
       if (!user) {
-        return req.respond({ status: 400 });
+        return req.respond({ status: 404 });
       }
 
       // hash the incoming password to a comparable salted hash
@@ -102,7 +102,7 @@ export function createSignInHandler(
           exp: now + accessTokenTTL,
           kid: ownKeyPair.kid
         },
-        { subtype: "access", id: user.id, role: user.role }
+        { id: user.id, role: user.role }
       );
 
       const refreshToken: string = stringifyRefreshToken(
@@ -112,7 +112,7 @@ export function createSignInHandler(
           exp: now + refreshTokenTTL,
           kid: ownKeyPair.kid
         },
-        { subtype: "refresh", id: user.id, role: user.role }
+        { id: user.id, role: user.role }
       );
 
       return req.respond({

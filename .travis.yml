@@ -9,6 +9,7 @@ before_script:
   - curl -sSL https://deno.land/x/install/install.sh | sh
   - curl -sSL https://denopkg.com/chiefbiiko/dynamodb/start_db.sh | bash
   - $HOME/.deno/bin/deno run --allow-env --allow-net ./setup_db.ts
+  - $HOME/.deno/bin/deno run --allow-read=$(pwd) --allow-env --allow-net ./setup_server.ts &
 
 script:
-  - ACCESS_KEY_ID=fraud SECRET_ACCESS_KEY=fraud $HOME/.deno/bin/deno run --allow-env --allow-net ./test.ts
+  - $HOME/.deno/bin/deno run --allow-env --allow-net ./test.ts

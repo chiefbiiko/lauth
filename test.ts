@@ -1,131 +1,385 @@
 import { test, runIfMain } from "https://deno.land/std/testing/mod.ts";
-import { assertEquals } from "https://deno.land/std/testing/asserts.ts";
-import { Server, serve } from "https://deno.land/std/http/server.ts";
-import * as BWT from "https://denopkg.com/chiefbiiko/bwt/mod.ts";
 import {
-  DynamoDBClient,
-  createClient
-} from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
-import { Handler, UserPrivate } from "./common.ts";
-import {
-  createSignUpHandler,
-  createSignInHandler,
-  createRefreshHandler
-} from "./mod.ts";
+  assert,
+  assertEquals,
+  assertNotEquals
+} from "https://deno.land/std/testing/asserts.ts";
 
-const ENV: { [key: string]: any } = Deno.env();
+/** Precompiled regex. */
+const TOKEN_REGEX: RegExp = /[^\.]+\.[^\.]+\.[^\.]+/;
 
-const ddbc: DynamoDBClient = createClient({
-  accessKeyId: ENV.ACCESS_KEY_ID || "fraud",
-  secretAccessKey: ENV.SECRET_ACCESS_KEY || "fraud",
-  region: "local"
-});
-
-const authEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
-
-const resourceEndpointsKeypair: BWT.KeyPair = BWT.generateKeys();
-
-const resourceEndpointsPeerPublicKey: BWT.PeerPublicKey = {
-  pk: resourceEndpointsKeypair.pk,
-  kid: resourceEndpointsKeypair.kid
-};
-
-async function emailExists(email: string): Promise<boolean> {
-  const result: { [key: string]: any } = await ddbc.getItem({
-    TableName: "users_emails",
-    Key: { email }
-  });
-
-  return !!result.Item;
+/** Timeable sleeping pill. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve: () => void) => setTimeout(resolve, ms));
 }
-
-async function createUser(user: UserPrivate): Promise<void> {
-  await ddbc.putItem({ TableName: "users", Item: user });
-
-  await ddbc.putItem({
-    TableName: "users_emails",
-    Item: { email: user.email, id: user.id }
-  });
-}
-
-async function readUserById(id: any): Promise<UserPrivate> {
-  const result: { [key: string]: any } = await ddbc.getItem({
-    TableName: "users",
-    Key: { id }
-  });
-
-  return result.Item || null;
-}
-
-async function readUserByEmail(email: string): Promise<UserPrivate> {
-  let result: { [key: string]: any } = await ddbc.getItem({
-    TableName: "users_emails",
-    Key: { email }
-  });
-
-  if (!result.Item) {
-    return null;
-  }
-
-  result = await ddbc.getItem({
-    TableName: "users",
-    Key: { id: result.Item.id }
-  });
-
-  return result.Item || null;
-}
-
-const signUp: Handler = createSignUpHandler(
-  "CUSTOMER",
-  emailExists,
-  createUser
-);
-
-const signIn: Handler = createSignInHandler(
-  authEndpointsKeypair,
-  resourceEndpointsPeerPublicKey,
-  readUserByEmail
-);
-
-const refresh: Handler = createRefreshHandler(
-  authEndpointsKeypair,
-  resourceEndpointsPeerPublicKey,
-  readUserById
-);
-
-async function main(): Promise<void> {
-  const s: Server = serve("localhost:4190");
-
-  for await (const req of s) {
-    if (req.url.endsWith("signup")) {
-      signUp(req);
-    } else if (req.url.endsWith("signin")) {
-      signIn(req);
-    } else if (req.url.endsWith("refresh")) {
-      refresh(req);
-    } else {
-      req.respond({ status: 404 });
-    }
-  }
-}
-
-main();
 
 test({
   name: "successful signup",
   async fn(): Promise<void> {
-    const body: string = JSON.stringify({
-      email: "chief@it.com",
-      password: "fraud"
-    });
-
     const response: Response = await fetch("http://localhost:4190/signup", {
       method: "POST",
-      body
+      body: JSON.stringify({ email: "chief@it.com", password: "fraud419" })
     });
 
     assertEquals(response.status, 201);
   }
 });
 
-runIfMain(import.meta);
+test({
+  name: "conflicting signup",
+  async fn(): Promise<void> {
+    let body: string = JSON.stringify({
+      email: "noop@it.com",
+      password: "secret12"
+    });
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body
+    });
+
+    assertEquals(response.status, 201);
+
+    response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body
+    });
+
+    assertEquals(response.status, 409);
+  }
+});
+
+test({
+  name: "failed signup due to malformatted email",
+  async fn(): Promise<void> {
+    const email: string = "@it.wtf";
+    const password: string = "weakweak";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 400);
+  }
+});
+
+test({
+  name: "failed signup due to too short password",
+  async fn(): Promise<void> {
+    const email: string = "me@it.yo";
+    const password: string = "short";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 400);
+  }
+});
+
+test({
+  name: "successful signin",
+  async fn(): Promise<void> {
+    const email: string = "u@it.wtf";
+    const password: string = "weakweak";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const body: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(body.accessToken));
+
+    assert(TOKEN_REGEX.test(body.refreshToken));
+
+    assertNotEquals(body.accessToken, body.refreshToken);
+  }
+});
+
+test({
+  name: "failed signin due to wrong password",
+  async fn(): Promise<void> {
+    const email: string = "u@it.wtf";
+    const password: string = "weakweak";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}wrong`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 401);
+  }
+});
+
+test({
+  name: "failed signin due to unknown email",
+  async fn(): Promise<void> {
+    const email: string = "u@it.wtf";
+    const password: string = "weakweak";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`unknown@it.wtf:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 404);
+  }
+});
+
+test({
+  name: "failed signin due to invalid auth type",
+  async fn(): Promise<void> {
+    const email: string = "u@it.wtf";
+    const password: string = "weakweak";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `bearer ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 400);
+  }
+});
+
+test({
+  name: "successful refresh",
+  async fn(): Promise<void> {
+    const email: string = "ridder@it.nl";
+    const password: string = "ridridrid";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const signInBody: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(signInBody.accessToken));
+
+    assert(TOKEN_REGEX.test(signInBody.refreshToken));
+
+    assertNotEquals(signInBody.accessToken, signInBody.refreshToken);
+
+    response = await fetch("http://localhost:4190/refresh", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `bearer ${signInBody.refreshToken}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const refreshBody: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(refreshBody.accessToken));
+
+    assert(TOKEN_REGEX.test(refreshBody.refreshToken));
+
+    assertNotEquals(refreshBody.accessToken, refreshBody.refreshToken);
+
+    assertNotEquals(signInBody, refreshBody);
+  }
+});
+
+test({
+  name: "failed refresh due to expired refresh token",
+  async fn(): Promise<void> {
+    const email: string = "djb@math.uic.edu";
+    const password: string = "somemathformula";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const signInBody: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(signInBody.accessToken));
+
+    assert(TOKEN_REGEX.test(signInBody.refreshToken));
+
+    assertNotEquals(signInBody.accessToken, signInBody.refreshToken);
+
+    // letting the refresh token expire
+    await sleep(2000);
+
+    response = await fetch("http://localhost:4190/refresh", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `bearer ${signInBody.refreshToken}`
+      })
+    });
+
+    assertEquals(response.status, 401);
+  }
+});
+
+test({
+  name: "failed refresh due to passing an access token",
+  async fn(): Promise<void> {
+    const email: string = "tanja@hyperelliptic.org";
+    const password: string = "anothermathformula";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const signInBody: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(signInBody.accessToken));
+
+    assert(TOKEN_REGEX.test(signInBody.refreshToken));
+
+    assertNotEquals(signInBody.accessToken, signInBody.refreshToken);
+
+    response = await fetch("http://localhost:4190/refresh", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `bearer ${signInBody.accessToken}`
+      })
+    });
+
+    assertEquals(response.status, 401);
+  }
+});
+
+test({
+  name: "failed refresh due to a fake token signature",
+  async fn(): Promise<void> {
+    const email: string = "moxie@thoughtcrime.org";
+    const password: string = "axolotls";
+
+    let response: Response = await fetch("http://localhost:4190/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    assertEquals(response.status, 201);
+
+    const auth: string = btoa(`${email}:${password}`);
+
+    response = await fetch("http://localhost:4190/signin", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `basic ${auth}`
+      })
+    });
+
+    assertEquals(response.status, 200);
+
+    const signInBody: { [key: string]: any } = await response.json();
+
+    assert(TOKEN_REGEX.test(signInBody.accessToken));
+
+    assert(TOKEN_REGEX.test(signInBody.refreshToken));
+
+    assertNotEquals(signInBody.accessToken, signInBody.refreshToken);
+
+    // mallealing the signature
+    signInBody.refreshToken = signInBody.refreshToken.replace(
+      /\.[^\.]*$/,
+      ".ZGVhZGJlZWZkZWFkYmVlZg=="
+    );
+
+    response = await fetch("http://localhost:4190/refresh", {
+      method: "POST",
+      headers: new Headers({
+        authorization: `bearer ${signInBody.refreshToken}`
+      })
+    });
+
+    assertEquals(response.status, 401);
+  }
+});
+
+runIfMain(import.meta, { parallel: true });

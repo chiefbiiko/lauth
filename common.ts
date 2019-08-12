@@ -1,5 +1,8 @@
 import { ServerRequest } from "https://deno.land/std/http/server.ts";
 
+/** Precompiled email regex. */
+const EMAIL_REGEX: RegExp = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/;
+
 /** Token TTL in ms. */
 export const ONE_HOUR: number = 1000 * 60 * 60 * 1;
 export const TWO_HOURS: number = 1000 * 60 * 60 * 2;
@@ -21,12 +24,10 @@ export function equal(a: Uint8Array, b: Uint8Array): boolean {
 /** Validation helpers. */
 export const valid = {
   email(candidate: string): boolean {
-    // TODO
-    return true;
+    return EMAIL_REGEX.test(candidate);
   },
   password(candidate: string): boolean {
-    // TODO
-    return true;
+    return candidate && candidate.length >= 8;
   }
 };
 

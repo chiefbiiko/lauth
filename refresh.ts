@@ -71,11 +71,6 @@ export function createRefreshHandler(
         return req.respond({ status: 401 });
       }
 
-      // make sure the token is a refresh token
-      if (contents.payload.subtype !== "refresh") {
-        return req.respond({ status: 403 });
-      }
-
       // issuing an access and refresh token
       const user: UserPrivate = await readUserById(contents.payload.id);
 
@@ -88,7 +83,7 @@ export function createRefreshHandler(
           exp: now + accessTokenTTL,
           kid: ownKeyPair.kid
         },
-        { subtype: "access", id: contents.payload.id, role: user.role }
+        { id: contents.payload.id, role: user.role }
       );
 
       const refreshToken: string = stringifyRefreshToken(
@@ -98,7 +93,7 @@ export function createRefreshHandler(
           exp: now + refreshTokenTTL,
           kid: ownKeyPair.kid
         },
-        { subtype: "refresh", id: contents.payload.id, role: user.role }
+        { id: contents.payload.id, role: user.role }
       );
 
       return req.respond({
