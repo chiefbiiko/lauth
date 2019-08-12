@@ -1,23 +1,17 @@
 import { test, runIfMain } from "https://deno.land/std/testing/mod.ts";
-
 import { assertEquals } from "https://deno.land/std/testing/asserts.ts";
-
 import { Server, serve } from "https://deno.land/std/http/server.ts";
-
 import * as BWT from "https://denopkg.com/chiefbiiko/bwt/mod.ts";
-
 import {
   DynamoDBClient,
   createClient
 } from "https://denopkg.com/chiefbiiko/dynamodb/mod.ts";
-
-import { Handler, UserPrivate } from "./../common.ts";
-
+import { Handler, UserPrivate } from "./common.ts";
 import {
   createSignUpHandler,
   createSignInHandler,
   createRefreshHandler
-} from "./../mod.ts";
+} from "./mod.ts";
 
 const ENV: { [key: string]: any } = Deno.env();
 
