@@ -10,9 +10,8 @@
       const password = $("#password").value;
       const body = JSON.stringify({ email, password });
 
-      fetch("http://localhost:4190/signup", { method: "POST", body }).catch(err =>
-        alert(err.message)
-      );
+      fetch("http://localhost:4190/signup", { method: "POST", body })
+        .catch(err => alert(`error: ${err.message}`));
     };
 
     $("#signin").onclick = async () => {
@@ -27,8 +26,34 @@
         })
       })
         .then(res => res.text())
-        .then(text => text && alert(`response: ${text}`))
-        .catch(err => alert(err.message));
+        .then(text => {
+          localStorage.setItem('tokens', text)
+          
+          if (text) {
+            alert(`response: ${text}`)
+          }
+        })
+        .catch(err => alert(`error: ${err.message}`));
+    };
+    
+    $("#refresh").onclick = async () => {
+      const tokens = JSON.parse(localStorage.getItem("tokens"));
+
+      fetch("http://localhost:4190/refresh", {
+        method: "POST",
+        headers: new Headers({
+          Authorization: `Bearer ${tokens.refreshToken}`
+        })
+      })
+        .then(res => res.text())
+        .then(text => {
+          localStorage.setItem('tokens', text)
+          
+          if (text) {
+            alert(`response: ${text}`)
+          }
+        })
+        .catch(err => alert(`error: ${err.message}`));
     };
   };
   </script>
